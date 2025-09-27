@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hacker Loading Screen</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --green: #00ff9c;
+      --dark: #0a0f0a;
+      --scanline: rgba(255, 255, 255, 0.03);
+    }
+
+    /* Subtle CRT scanlines */
+    .scanlines::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        to bottom,
+        var(--scanline) 0px,
+        var(--scanline) 1px,
+        transparent 2px,
+        transparent 3px
+      );
+      mix-blend-mode: overlay;
+      pointer-events: none;
+      animation: scan-move 6s linear infinite;
+    }
+    @keyframes scan-move {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(3px); }
+    }
+
+    /* Flicker */
+    .flicker { animation: flicker 2.5s infinite; }
+    @keyframes flicker {
+      0%, 19%, 21%, 23%, 80%, 100% { opacity: 1; }
+      20%, 22% { opacity: 0.8; }
+      81% { opacity: 0.95; }
+    }
+
+    /* Glitch effect */
+    .glitch {
+      position: relative;
+    }
+    .glitch::before,
+    .glitch::after {
+      content: attr(data-text);
+      position: absolute;
+      left: 0; top: 0;
+      width: 100%;
+      overflow: hidden;
+      clip-path: inset(0 0 0 0);
+    }
+    .glitch::before {
+      animation: glitchTop 1.8s infinite linear alternate-reverse;
+      transform: translate(1px, -1px);
+      color: #8affc1;
+    }
+    .glitch::after {
+      animation: glitchBottom 1.6s infinite linear alternate-reverse;
+      transform: translate(-1px, 1px);
+      color: #00e6ff;
+    }
+    @keyframes glitchTop {
+      0% { clip-path: inset(0 0 80% 0); }
+      20% { clip-path: inset(0 0 60% 0); }
+      40% { clip-path: inset(0 0 70% 0); }
+      60% { clip-path: inset(0 0 50% 0); }
+      80% { clip-path: inset(0 0 65% 0); }
+      100% { clip-path: inset(0 0 75% 0); }
+    }
+    @keyframes glitchBottom {
+      0% { clip-path: inset(80% 0 0 0); }
+      20% { clip-path: inset(70% 0 0 0); }
+      40% { clip-path: inset(60% 0 0 0); }
+      60% { clip-path: inset(50% 0 0 0); }
+      80% { clip-path: inset(65% 0 0 0); }
+      100% { clip-path: inset(75% 0 0 0); }
+    }
+
+    /* Matrix rain canvas sits behind content */
+    #matrix {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      filter: blur(0.2px) contrast(1.05) saturate(1.1);
+      opacity: 0.4;
+    }
+
+    /* Accessibility: lessen effects for reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      .scanlines::after { animation: none; }
+      .flicker { animation: none; }
+      .glitch::before, .glitch::after { animation: none; display: none; }
+      #matrix { display: none; }
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-black text-[var(--green)] overflow-hidden">
+  <!-- Background matrix rain -->
+  <canvas id="matrix" aria-hidden="true"></canvas>
+
+  <!-- Foreground content -->
+  <main class="relative h-dvh grid place-items-center scanlines">
+    <section class="w-[min(92vw,960px)] rounded-2xl border border-emerald-400/40 bg-black/40 backdrop-blur-sm shadow-[0_0_40px_rgba(0,255,156,0.1)] p-6 sm:p-10">
+      <header class="mb-6 sm:mb-8">
+        <h1 class="glitch text-center font-mono text-2xl sm:text-4xl md:text-5xl tracking-widest drop-shadow" data-text="SYSTEM INITIALIZING…">
+          <span class="relative z-10">SYSTEM INITIALIZING…</span>
+        </h1>
+        <p class="text-center font-mono text-xs sm:text-sm opacity-70 mt-2">protocol v3.9 · secure channel · AES–256</p>
+      </header>
+
+      <!-- Terminal window -->
+      <div class="font-mono text-sm sm:text-base leading-relaxed">
+        <div id="terminal" class="h-[38vh] sm:h-[42vh] md:h-[46vh] overflow-hidden rounded-xl border border-emerald-500/20 bg-black/50 p-4 sm:p-6">
+          <pre id="log" class="whitespace-pre-wrap"></pre>
+          <div class="mt-3 flex items-center gap-3">
+            <div class="h-2 flex-1 rounded-full bg-emerald-500/10 overflow-hidden">
+              <div id="bar" class="h-full w-0 bg-emerald-400/90 shadow-[0_0_10px_#00ff9c] transition-[width] duration-150"></div>
+            </div>
+            <span id="percent" class="w-12 text-right tabular-nums">0%</span>
+          </div>
+        </div>
+
+        <div class="mt-6 flex items-center justify-between">
+          <button id="skip" class="px-3 py-2 rounded-lg border border-emerald-400/40 hover:border-emerald-300/80 hover:shadow-[0_0_12px_rgba(0,255,156,0.25)] active:scale-[.98] transition focus:outline-none focus:ring-1 focus:ring-emerald-300/80">Skip</button>
+          <span class="text-xs opacity-60">Press any key to skip</span>
+        </div>
+      </div>
+
+      <!-- Final state -->
+      <div id="done" class="hidden mt-10 text-center">
+        <h2 class="glitch text-3xl sm:text-5xl font-mono font-bold tracking-[0.25em]" data-text="ACCESS GRANTED">
+          <span class="relative z-10">ACCESS GRANTED</span>
+        </h2>
+        <p class="mt-3 opacity-80 font-mono">Handshake complete · Route established</p>
+        <a href="#" class="inline-block mt-6 px-4 py-2 rounded-xl border border-emerald-400/40 hover:border-emerald-300/80 hover:shadow-[0_0_12px_rgba(0,255,156,0.25)] transition">Continue</a>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // ===== Matrix Rain Background =====
+    (function matrixRain(){
+      const canvas = document.getElementById('matrix');
+      const ctx = canvas.getContext('2d');
+      const katakana = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン';
+      const latin = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      const glyphs = (katakana + latin).split('');
+
+      function resize(){
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        columns = Math.floor(canvas.width / fontSize);
+        drops = new Array(columns).fill(1 + Math.random()*20);
+      }
+
+      let fontSize = 16;
+      let columns = 0;
+      let drops = [];
+
+      function draw(){
+        ctx.fillStyle = 'rgba(0,0,0,0.08)';
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.fillStyle = '#00ff9c';
+        ctx.font = fontSize + 'px monospace';
+        for(let i=0;i<drops.length;i++){
+          const text = glyphs[(Math.random()*glyphs.length)|0];
+          ctx.fillText(text, i*fontSize, drops[i]*fontSize);
+          if(drops[i]*fontSize > canvas.height && Math.random() > 0.975){
+            drops[i] = 0;
+          }
+          drops[i]++;
+        }
+        requestAnimationFrame(draw);
+      }
+
+      resize();
+      window.addEventListener('resize', resize);
+      draw();
+    })();
+
+    // ===== Typing Terminal =====
+    const log = document.getElementById('log');
+    const bar = document.getElementById('bar');
+    const percent = document.getElementById('percent');
+    const skipBtn = document.getElementById('skip');
+    const done = document.getElementById('done');
+    const main = document.querySelector('main');
+
+    const lines = [
+      '[BOOT] Initiating secure environment…',
+      '[OK]  Kernel modules verified',
+      '[OK]  Entropy pool seeded (4096 bits)',
+      '[IO]  Scanning peripherals: /dev/tty*',
+      '[BLE] Adapter found · MAC 7C:21:9A:**:**:**',
+      '[NET] Resolving route: 10.0.0.42 ⇄ 10.0.0.7',
+      '[TLS] ECDHE handshake · AES-256-GCM',
+      '[AUTH] Token accepted · scope=system:root',
+      '[SYNC] Negotiating clock drift (±1ms)',
+      '[FS]  Mounting tmpfs @ /mnt/secure',
+      '[PROC] Spawning services: logger, watcher, planner',
+      '[OK]  Integrity check passed',
+      '[LAUNCH] Starting main routine…'
+    ];
+
+    let i = 0; // line index
+    let p = 0; // percent
+    let skipping = false;
+
+    function updateProgress(val){
+      p = Math.min(100, Math.max(p, val));
+      bar.style.width = p + '%';
+      percent.textContent = Math.floor(p) + '%';
+    }
+
+    function typeLine(text, cb){
+      const el = document.createElement('div');
+      el.className = 'flicker';
+      log.appendChild(el);
+
+      let idx = 0;
+      const speedBase = 10 + Math.random()*25; // per char
+
+      function tick(){
+        if (skipping) { el.textContent = text; cb && cb(); return; }
+        el.textContent = text.slice(0, idx++);
+        updateProgress((i/lines.length)*100 + (idx/text.length)* (100/lines.length)*0.7);
+        if (idx <= text.length) {
+          setTimeout(tick, speedBase * (Math.random()*0.6 + 0.4));
+        } else {
+          el.classList.remove('flicker');
+          cb && cb();
+        }
+      }
+      tick();
+    }
+
+    function nextLine(){
+      if (i >= lines.length) return finish();
+      typeLine(lines[i++], () => {
+        const pause = skipping ? 0 : 200 + Math.random()*300;
+        setTimeout(nextLine, pause);
+      });
+    }
+
+    function finish(){
+      updateProgress(100);
+      main.querySelector('section').classList.add('ring-1','ring-emerald-300/60','shadow-[0_0_40px_rgba(0,255,156,0.25)]');
+      done.classList.remove('hidden');
+      // Auto-scroll log to bottom in case overflowed
+      log.parentElement.scrollTop = log.parentElement.scrollHeight;
+    }
+
+    // Skip controls
+    function skip(){
+      if (skipping) return;
+      skipping = true;
+      // Flush remaining lines
+      while (i < lines.length) {
+        const el = document.createElement('div');
+        el.textContent = lines[i++];
+        log.appendChild(el);
+      }
+      finish();
+    }
+
+    skipBtn.addEventListener('click', skip);
+    window.addEventListener('keydown', skip, { once: false });
+
+    // Start
+    nextLine();
+  </script>
+</body>
+</html>
